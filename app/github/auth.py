@@ -4,23 +4,19 @@ import time
 import httpx
 import jwt
 
-GITHUB_APP_ID = os.environ.get("GITHUB_APP_ID", "")
-GITHUB_PRIVATE_KEY_PATH = os.environ.get("GITHUB_PRIVATE_KEY_PATH", "./private-key.pem")
-
-
-def _load_private_key() -> str:
-    with open(GITHUB_PRIVATE_KEY_PATH) as f:
-        return f.read()
-
 
 def _generate_jwt() -> str:
+    app_id = os.environ["GITHUB_APP_ID"]
+    key_path = os.environ.get("GITHUB_PRIVATE_KEY_PATH", "./private-key.pem")
+    with open(key_path) as f:
+        private_key = f.read()
     now = int(time.time())
     payload = {
         "iat": now - 60,        # issued 60s ago to cover clock skew
         "exp": now + (10 * 60), # expires in 10 minutes
-        "iss": int(GITHUB_APP_ID),
+        "iss": app_id,
     }
-    return jwt.encode(payload, _load_private_key(), algorithm="RS256")
+    return jwt.encode(payload, private_key, algorithm="RS256")
 
 
 async def get_installation_token(installation_id: int) -> str:

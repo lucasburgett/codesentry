@@ -5,13 +5,14 @@ import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, Header, HTTPException, Request
 
 from app.db.database import create_analysis, init_db
 from app.github.auth import get_installation_token
 from app.github.comment import post_comment
-
-load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
