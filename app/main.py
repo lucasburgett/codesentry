@@ -10,9 +10,11 @@ load_dotenv()
 
 from fastapi import FastAPI, Header, HTTPException, Request
 
+from app.analysis.detect import detect_ai_files
+from app.analysis.diff import get_pr_commits, get_pr_files
 from app.db.database import create_analysis, init_db
 from app.github.auth import get_installation_token
-from app.github.comment import post_comment
+from app.github.comment import edit_comment, post_comment
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -88,8 +90,20 @@ async def handle_pr_event(
         pr_number,
         "🔍 CodeSentry is analyzing this PR...",
     )
-    print(f"comment_id={comment_id}")
     logger.info("Posted comment %s on %s#%s", comment_id, repo_full_name, pr_number)
+
+    files = await get_pr_files(token, repo_full_name, pr_number)
+    commits = await get_pr_commits(token, repo_full_name, pr_number)
+    ai_files = detect_ai_files(files, commits)
+
+    if ai_files:
+        filenames = ", ".join(f[0] for f in ai_files)
+        body = f"🔍 Detected {len(ai_files)} likely AI-authored files: {filenames}. Static analysis running..."
+    else:
+        body = "✅ No AI-authored files detected in this PR."
+
+    await edit_comment(token, repo_full_name, comment_id, body)
+    logger.info("Updated comment: %s", body[:80])
 
     analysis_id = create_analysis(
         installation_id=installation_id,
