@@ -1,0 +1,49 @@
+rules:
+  - id: promise-without-catch
+    patterns:
+      - pattern: $PROMISE.then(...)
+      - pattern-not: $PROMISE.then(...).catch(...)
+    message: >-
+      `.then()` chain without `.catch()` — unhandled promise rejection will crash
+      at runtime.
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: correctness
+
+  - id: console-log-left-in
+    pattern: console.log(...)
+    paths:
+      exclude:
+        - "*test*"
+        - "*spec*"
+        - "*.test.*"
+        - "*.spec.*"
+    message: >-
+      `console.log()` left in production code — remove or replace with a proper
+      logger.
+    severity: INFO
+    languages: [typescript, javascript]
+    metadata:
+      category: quality
+
+  - id: hardcoded-url-string
+    patterns:
+      - pattern: $VAR = "=~/https?:\/\//"
+    message: >-
+      Hardcoded URL in `$VAR` — extract to a configuration constant or
+      environment variable.
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: correctness
+
+  - id: any-type-escape-hatch
+    pattern: $EXPR as any
+    message: >-
+      `as any` bypasses TypeScript type checking — use a proper type or generic
+      instead.
+    severity: WARNING
+    languages: [typescript]
+    metadata:
+      category: quality

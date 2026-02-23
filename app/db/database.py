@@ -46,6 +46,37 @@ def init_db() -> None:
         conn.execute(_CREATE_FINDINGS)
 
 
+def create_finding(
+    analysis_id: int,
+    rule_id: str,
+    category: str,
+    severity: str,
+    file_path: str,
+    line_start: int,
+    message: str,
+) -> int:
+    """Insert a finding row and return its id."""
+    with _connect() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO findings
+                (analysis_id, rule_id, category, severity, file_path, line_start, message)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (analysis_id, rule_id, category, severity, file_path, line_start, message),
+        )
+        return cursor.lastrowid
+
+
+def update_analysis_status(analysis_id: int, status: str) -> None:
+    """Update the status of an analysis."""
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE analyses SET status = ? WHERE id = ?",
+            (status, analysis_id),
+        )
+
+
 def create_analysis(
     installation_id: int,
     repo_full_name: str,

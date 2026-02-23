@@ -1,0 +1,78 @@
+rules:
+  - id: hardcoded-secret-string
+    patterns:
+      - pattern: $VAR = "..."
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: .*(api_key|secret|password|token|auth).*
+    message: >-
+      Hardcoded secret in `$VAR`. Move to an environment variable or secrets manager.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
+
+  - id: sql-fstring-injection
+    patterns:
+      - pattern-either:
+          - pattern: $CURSOR.execute(f"...")
+          - pattern: $CURSOR.execute(f'...')
+          - pattern: $CURSOR.query(f"...")
+          - pattern: $CURSOR.query(f'...')
+    message: >-
+      SQL query built with f-string — use parameterized queries to prevent injection.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
+
+  - id: bare-except-swallows-errors
+    patterns:
+      - pattern: |
+          try:
+              ...
+          except:
+              pass
+    message: >-
+      Bare `except: pass` silently swallows all errors including KeyboardInterrupt.
+      Catch a specific exception and log the error.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      category: correctness
+
+  - id: unchecked-requests-response
+    patterns:
+      - pattern: $RESP = requests.$METHOD(...)
+      - pattern-not-inside: |
+          ...
+          $RESP.raise_for_status()
+          ...
+      - pattern-not-inside: |
+          ...
+          $RESP.status_code
+          ...
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: ^(get|post|put|patch|delete)$
+    message: >-
+      HTTP response from `requests.$METHOD()` is not checked — call
+      `.raise_for_status()` or inspect `.status_code`.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      category: correctness
+
+  - id: open-without-context-manager
+    patterns:
+      - pattern: $FH = open(...)
+      - pattern-not-inside: |
+          with ... as $FH:
+              ...
+    message: >-
+      `open()` without a context manager — use `with open(...) as f:` to ensure
+      the file is closed.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      category: correctness

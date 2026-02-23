@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import logging
 import os
+import shutil
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -12,7 +13,14 @@ from fastapi import FastAPI, Header, HTTPException, Request
 
 from app.analysis.detect import detect_ai_files
 from app.analysis.diff import get_pr_commits, get_pr_files
-from app.db.database import create_analysis, init_db
+from app.analysis.pipeline import write_diff_to_tmp
+from app.analysis.semgrep import run_semgrep
+from app.db.database import (
+    create_analysis,
+    create_finding,
+    init_db,
+    update_analysis_status,
+)
 from app.github.auth import get_installation_token
 from app.github.comment import edit_comment, post_comment
 
@@ -96,14 +104,30 @@ async def handle_pr_event(
     commits = await get_pr_commits(token, repo_full_name, pr_number)
     ai_files = detect_ai_files(files, commits)
 
-    if ai_files:
-        filenames = ", ".join(f[0] for f in ai_files)
-        body = f"🔍 Detected {len(ai_files)} likely AI-authored files: {filenames}. Static analysis running..."
-    else:
-        body = "✅ No AI-authored files detected in this PR."
+    if not ai_files:
+        await edit_comment(
+            token, repo_full_name, comment_id,
+            "✅ No AI-authored files detected in this PR.",
+        )
+        logger.info("No AI files detected in %s#%s", repo_full_name, pr_number)
+        return
 
-    await edit_comment(token, repo_full_name, comment_id, body)
-    logger.info("Updated comment: %s", body[:80])
+    ai_filenames = {name for name, _ in ai_files}
+    filenames_str = ", ".join(sorted(ai_filenames))
+    await edit_comment(
+        token, repo_full_name, comment_id,
+        f"🔍 Detected {len(ai_files)} likely AI-authored file(s): {filenames_str}. "
+        "Static analysis running...",
+    )
+
+    # Write files to disk for Semgrep
+    ai_file_dicts = [f for f in files if f["filename"] in ai_filenames]
+    tmp_dir, written_paths = await write_diff_to_tmp(ai_file_dicts, token)
+
+    try:
+        findings = await run_semgrep(written_paths, tmp_dir)
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
     analysis_id = create_analysis(
         installation_id=installation_id,
@@ -111,6 +135,58 @@ async def handle_pr_event(
         pr_number=pr_number,
         pr_head_sha=pr["head"]["sha"],
         comment_id=comment_id,
-        status="pending",
+        status="complete" if findings is not None else "error",
     )
-    logger.info("Saved analysis id=%s for %s#%s", analysis_id, repo_full_name, pr_number)
+
+    for f in findings:
+        create_finding(
+            analysis_id=analysis_id,
+            rule_id=f["rule_id"],
+            category=f["category"],
+            severity=f["severity"],
+            file_path=f["file_path"],
+            line_start=f["line_start"],
+            message=f["message"],
+        )
+
+    body = _format_comment(ai_files, findings)
+    await edit_comment(token, repo_full_name, comment_id, body)
+    logger.info("Final comment on %s#%s: %s", repo_full_name, pr_number, body[:100])
+
+
+def _format_comment(
+    ai_files: list[tuple[str, float]],
+    findings: list[dict],
+) -> str:
+    """Build the final PR comment body."""
+    ai_filenames = sorted({name for name, _ in ai_files})
+    lines = [
+        f"🔍 Detected {len(ai_filenames)} likely AI-authored file(s): "
+        + ", ".join(ai_filenames),
+    ]
+
+    if not findings:
+        lines.append("\n✅ No issues found in AI-authored files.")
+        return "\n".join(lines)
+
+    errors = sum(1 for f in findings if f["severity"] == "error")
+    warnings = sum(1 for f in findings if f["severity"] == "warning")
+    infos = sum(1 for f in findings if f["severity"] == "info")
+
+    parts = []
+    if errors:
+        parts.append(f"{errors} error{'s' if errors != 1 else ''}")
+    if warnings:
+        parts.append(f"{warnings} warning{'s' if warnings != 1 else ''}")
+    if infos:
+        parts.append(f"{infos} info")
+
+    lines.append(f"\nFound {len(findings)} issue{'s' if len(findings) != 1 else ''}: {', '.join(parts)}")
+
+    for f in findings:
+        lines.append(
+            f"  • [{f['category']}] {f['rule_id']} · "
+            f"{f['file_path']}:{f['line_start']} — {f['message']}"
+        )
+
+    return "\n".join(lines)
