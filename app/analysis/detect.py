@@ -4,8 +4,8 @@ import re
 
 # Heuristic 1: commit message patterns (case-insensitive)
 _COMMIT_PATTERNS = [
-    r"co-authored-by\s*:?\s*.*copilot",
-    r"generated\s+(?:with|by|using)\s+(?:cursor|copilot|claude|chatgpt|gpt)",
+    r"co-authored-by\s*:?\s*.*(?:copilot|cody|devin)",
+    r"generated\s+(?:with|by|using)\s+(?:cursor|copilot|claude|chatgpt|gpt|aider|codeium|tabnine|windsurf|devin)",
     r"ai[.\s-]?generated",
     r"vibe[.\s-]?cod",
 ]
@@ -21,7 +21,7 @@ def _commit_heuristic_matches(commit_messages: list[str]) -> bool:
 
 
 def _patch_line_count(patch: str) -> int:
-    """Count added lines in a diff patch (for new files, this is the file size)."""
+    """Count added lines in a diff patch."""
     if not patch:
         return 0
     count = 0
@@ -35,18 +35,16 @@ def _heuristic2_score(patch: str, filename: str) -> float:
     """
     Code style signals: each adds 0.15, capped at 0.6.
     Signals: triple-quoted docstrings, # Step N:, TODO: Add error handling,
-    suspiciously uniform type hints.
+    suspiciously uniform type hints, excessive inline comments.
     """
     if not patch:
         return 0.0
 
     score = 0.0
 
-    # # Step N: style comments
     if re.search(r"#\s*Step\s+\d+\s*:", patch, re.I):
         score += 0.15
 
-    # TODO: Add error handling (or similar)
     if re.search(r"TODO\s*:\s*Add\s+error\s+handling", patch, re.I):
         score += 0.15
 
@@ -57,7 +55,7 @@ def _heuristic2_score(patch: str, filename: str) -> float:
         if "/**" in patch and "*/" in patch:
             score += 0.15
 
-    # Uniform type hints - multiple typed params (Python or TypeScript)
+    # Uniform type hints
     if filename.endswith(".py"):
         if re.findall(r":\s*(?:int|str|bool|float|list|dict|Optional)\s*[,\)]", patch):
             typed_count = len(re.findall(r"\w+\s*:\s*(?:int|str|bool|float|list|dict|Optional)\b", patch))
@@ -68,22 +66,33 @@ def _heuristic2_score(patch: str, filename: str) -> float:
         if typed_count >= 2:
             score += 0.15
 
+    # Excessive inline comments narrating obvious code
+    trivial_comments = re.findall(
+        r"#\s*(?:import|define|set|create|initialize|return|get|check|handle)\s",
+        patch, re.I,
+    )
+    if len(trivial_comments) >= 3:
+        score += 0.3
+
     return min(score, 0.6)
 
 
 def _heuristic3_score(file_dict: dict) -> float:
-    """New files >100 lines that appear complete: +0.4."""
-    if file_dict.get("status") != "added":
-        return 0.0
-
+    """
+    Large-change file signal.
+    New files >100 added lines: +0.4
+    Modified files >200 added lines: +0.3
+    """
     patch = file_dict.get("patch", "")
     lines = _patch_line_count(patch)
-    if lines < 100:
-        return 0.0
+    status = file_dict.get("status", "")
 
-    # "Appear complete" - simple check: has multiple logical blocks (functions/classes)
-    # New file with 100+ lines of code is a strong signal
-    return 0.4
+    if status == "added" and lines >= 100:
+        return 0.4
+    if status == "modified" and lines >= 200:
+        return 0.3
+
+    return 0.0
 
 
 def detect_ai_files(
@@ -91,7 +100,7 @@ def detect_ai_files(
 ) -> list[tuple[str, float]]:
     """
     Detect files likely AI-authored. Returns list of (filename, confidence).
-    Uses three heuristics. Files with combined confidence >= 0.4 are flagged.
+    Uses three heuristics. Files with combined confidence >= 0.3 are flagged.
 
     commit_messages: list of strings, or list of dicts with "message" key.
     """
@@ -115,7 +124,7 @@ def detect_ai_files(
         h2 = _heuristic2_score(f.get("patch", ""), f.get("filename", ""))
         h3 = _heuristic3_score(f)
         combined = h2 + h3
-        if combined >= 0.4:
+        if combined >= 0.3:
             result.append((f["filename"], round(min(combined, 1.0), 2)))
 
     return result

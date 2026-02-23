@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.analysis.semgrep import SemgrepResult
 from app.main import app
 
 FAKE_PR_PAYLOAD = {
@@ -83,7 +84,7 @@ class TestWebhookSignature:
 class TestPREventFlow:
     """Full happy-path: PR opened → detect AI files → semgrep → update comment."""
 
-    @patch("app.main.run_semgrep", new_callable=AsyncMock, return_value=FAKE_FINDINGS)
+    @patch("app.main.run_semgrep", new_callable=AsyncMock, return_value=SemgrepResult(findings=FAKE_FINDINGS))
     @patch("app.main.write_diff_to_tmp", new_callable=AsyncMock, return_value=("/tmp/x", ["/tmp/x/app.py"]))
     @patch("app.main.edit_comment", new_callable=AsyncMock)
     @patch("app.main.post_comment", new_callable=AsyncMock, return_value=999)
@@ -146,7 +147,7 @@ class TestPREventFlow:
         edit_body = mock_edit.call_args.args[3] if mock_edit.call_args else ""
         assert "No AI-authored files detected" in edit_body
 
-    @patch("app.main.run_semgrep", new_callable=AsyncMock, return_value=[])
+    @patch("app.main.run_semgrep", new_callable=AsyncMock, return_value=SemgrepResult())
     @patch("app.main.write_diff_to_tmp", new_callable=AsyncMock, return_value=("/tmp/x", ["/tmp/x/app.py"]))
     @patch("app.main.edit_comment", new_callable=AsyncMock)
     @patch("app.main.post_comment", new_callable=AsyncMock, return_value=999)
@@ -173,6 +174,83 @@ class TestPREventFlow:
 
         final_body = mock_edit.call_args_list[-1].args[3]
         assert "No issues found" in final_body
+
+
+    @patch("app.main.run_semgrep", new_callable=AsyncMock, return_value=SemgrepResult(success=False, error="Semgrep timed out after 120s"))
+    @patch("app.main.write_diff_to_tmp", new_callable=AsyncMock, return_value=("/tmp/x", ["/tmp/x/app.py"]))
+    @patch("app.main.edit_comment", new_callable=AsyncMock)
+    @patch("app.main.post_comment", new_callable=AsyncMock, return_value=999)
+    @patch("app.main.get_pr_commits", new_callable=AsyncMock, return_value=FAKE_COMMITS)
+    @patch("app.main.get_pr_files", new_callable=AsyncMock, return_value=FAKE_FILES)
+    @patch("app.main.get_installation_token", new_callable=AsyncMock, return_value="fake-token")
+    def test_semgrep_error_shows_in_comment(
+        self,
+        mock_token,
+        mock_files,
+        mock_commits,
+        mock_post,
+        mock_edit,
+        mock_write_tmp,
+        mock_semgrep,
+        client,
+    ):
+        resp = client.post(
+            "/webhook",
+            json=FAKE_PR_PAYLOAD,
+            headers=_webhook_headers(),
+        )
+        assert resp.status_code == 200
+
+        final_body = mock_edit.call_args_list[-1].args[3]
+        assert "Static analysis error" in final_body
+
+    @patch("app.main.get_pr_files", new_callable=AsyncMock, side_effect=Exception("API down"))
+    @patch("app.main.edit_comment", new_callable=AsyncMock)
+    @patch("app.main.post_comment", new_callable=AsyncMock, return_value=999)
+    @patch("app.main.get_installation_token", new_callable=AsyncMock, return_value="fake-token")
+    def test_error_during_analysis_updates_comment(
+        self,
+        mock_token,
+        mock_post,
+        mock_edit,
+        mock_files,
+        client,
+    ):
+        resp = client.post(
+            "/webhook",
+            json=FAKE_PR_PAYLOAD,
+            headers=_webhook_headers(),
+        )
+        assert resp.status_code == 200
+
+        final_body = mock_edit.call_args_list[-1].args[3]
+        assert "encountered an error" in final_body
+
+
+class TestMalformedPayloads:
+    def test_missing_pull_request_key(self, client):
+        payload = {
+            "action": "opened",
+            "repository": {"full_name": "owner/repo"},
+            "installation": {"id": 12345},
+        }
+        resp = client.post(
+            "/webhook", json=payload, headers=_webhook_headers(),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["error"] == "malformed payload"
+
+    def test_missing_installation_key(self, client):
+        payload = {
+            "action": "opened",
+            "pull_request": {"number": 1, "head": {"sha": "abc"}},
+            "repository": {"full_name": "owner/repo"},
+        }
+        resp = client.post(
+            "/webhook", json=payload, headers=_webhook_headers(),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["error"] == "malformed payload"
 
 
 class TestNonPREvents:

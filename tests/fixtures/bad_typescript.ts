@@ -11,3 +11,7 @@ function processResponse(response: unknown) {
   const data = response as any;
   return data.value;
 }
+
+function getUser(users: Map<string, unknown>, id: string) {
+  return users.get(id)!;
+}

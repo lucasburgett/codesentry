@@ -1,10 +1,17 @@
 """Fetch PR files and commits from the GitHub API."""
 
+import logging
+import re
+
 import httpx
+
+logger = logging.getLogger(__name__)
 
 GITHUB_API = "https://api.github.com"
 
 _EXTENSIONS = frozenset({".py", ".ts", ".tsx", ".js", ".jsx"})
+
+_LINK_NEXT_RE = re.compile(r'<([^>]+)>;\s*rel="next"')
 
 
 def _headers(token: str) -> dict:
@@ -15,19 +22,30 @@ def _headers(token: str) -> dict:
     }
 
 
+async def _paginate(client: httpx.AsyncClient, url: str, headers: dict) -> list:
+    """Follow GitHub pagination and collect all items."""
+    items: list = []
+    while url:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        items.extend(response.json())
+        link = response.headers.get("link", "")
+        m = _LINK_NEXT_RE.search(link)
+        url = m.group(1) if m else None
+    return items
+
+
 async def get_pr_files(
     token: str, repo_full_name: str, pr_number: int
 ) -> list[dict]:
     """
     Fetch PR files from the GitHub API.
     Returns list of dicts with: filename, status, patch, raw_url.
-    Filters to .py, .ts, .tsx, .js, .jsx. Caps at 50 files (largest by line count).
+    Filters to .py, .ts, .tsx, .js, .jsx. Caps at 50 files (largest by change count).
     """
-    url = f"{GITHUB_API}/repos/{repo_full_name}/pulls/{pr_number}/files"
+    url = f"{GITHUB_API}/repos/{repo_full_name}/pulls/{pr_number}/files?per_page=100"
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=_headers(token))
-        response.raise_for_status()
-        files = response.json()
+        files = await _paginate(client, url, _headers(token))
 
     filtered = []
     for f in files:
@@ -44,27 +62,20 @@ async def get_pr_files(
             }
         )
 
-    if len(filtered) <= 50:
-        # Drop internal field before returning
-        return [
-            {k: v for k, v in f.items() if k != "_changes"}
-            for f in filtered
-        ]
+    if len(filtered) > 50:
+        filtered = sorted(filtered, key=lambda x: x["_changes"], reverse=True)[:50]
+        logger.info("Capped to 50 files (from %d)", len(filtered))
 
-    sorted_files = sorted(filtered, key=lambda x: x["_changes"], reverse=True)
-    top_50 = sorted_files[:50]
-    return [{k: v for k, v in f.items() if k != "_changes"} for f in top_50]
+    return [{k: v for k, v in f.items() if k != "_changes"} for f in filtered]
 
 
 async def get_pr_commits(
     token: str, repo_full_name: str, pr_number: int
 ) -> list[dict]:
-    """Fetch PR commits and return list of dicts with commit info (including message)."""
-    url = f"{GITHUB_API}/repos/{repo_full_name}/pulls/{pr_number}/commits"
+    """Fetch all PR commits (paginated) and return list of dicts with sha and message."""
+    url = f"{GITHUB_API}/repos/{repo_full_name}/pulls/{pr_number}/commits?per_page=100"
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=_headers(token))
-        response.raise_for_status()
-        commits = response.json()
+        commits = await _paginate(client, url, _headers(token))
 
     return [
         {

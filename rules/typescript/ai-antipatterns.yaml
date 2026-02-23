@@ -47,3 +47,41 @@ rules:
     languages: [typescript]
     metadata:
       category: quality
+
+  - id: non-null-assertion
+    pattern: $EXPR!
+    message: >-
+      Non-null assertion `!` bypasses null checks — use optional chaining
+      or explicit null handling instead.
+    severity: WARNING
+    languages: [typescript]
+    metadata:
+      category: quality
+
+  - id: dangerously-set-inner-html
+    pattern-either:
+      - pattern: <$EL dangerouslySetInnerHTML={$VALUE} />
+      - pattern: <$EL dangerouslySetInnerHTML={$VALUE}>...</$EL>
+    message: >-
+      `dangerouslySetInnerHTML` is an XSS vector — sanitize input or use
+      a safe rendering library.
+    severity: ERROR
+    languages: [typescript, javascript]
+    metadata:
+      category: security
+
+  - id: no-await-in-loop
+    patterns:
+      - pattern: |
+          for (...) {
+            ...
+            await $EXPR
+            ...
+          }
+    message: >-
+      `await` inside a loop runs sequentially — use `Promise.all()` for
+      parallel execution when order doesn't matter.
+    severity: WARNING
+    languages: [typescript, javascript]
+    metadata:
+      category: correctness

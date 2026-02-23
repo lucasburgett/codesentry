@@ -76,3 +76,60 @@ rules:
     languages: [python]
     metadata:
       category: correctness
+
+  - id: subprocess-shell-true
+    patterns:
+      - pattern-either:
+          - pattern: subprocess.run(..., shell=True, ...)
+          - pattern: subprocess.call(..., shell=True, ...)
+          - pattern: subprocess.Popen(..., shell=True, ...)
+          - pattern: subprocess.check_output(..., shell=True, ...)
+          - pattern: subprocess.check_call(..., shell=True, ...)
+    message: >-
+      `shell=True` is a command injection risk — pass a list of args instead.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
+
+  - id: eval-or-exec-usage
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+    message: >-
+      `eval()`/`exec()` can execute arbitrary code — avoid or restrict input.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      category: security
+
+  - id: mutable-default-argument
+    patterns:
+      - pattern-either:
+          - pattern: |
+              def $FUNC(..., $ARG=[], ...):
+                  ...
+          - pattern: |
+              def $FUNC(..., $ARG={}, ...):
+                  ...
+    message: >-
+      Mutable default argument `$ARG` is shared across calls — use `None`
+      and assign inside the function body.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      category: correctness
+
+  - id: assert-used-for-validation
+    pattern: assert ...
+    paths:
+      exclude:
+        - "*test*"
+        - "*spec*"
+    message: >-
+      `assert` is stripped in optimized mode (`-O`) — use `if`/`raise`
+      for runtime validation.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      category: correctness

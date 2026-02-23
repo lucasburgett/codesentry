@@ -31,54 +31,73 @@ def tmp_dir():
 @pytest.mark.asyncio
 async def test_bad_python_fires_all_rules(tmp_dir):
     path = _copy_fixture("bad_python.py", tmp_dir)
-    findings = await run_semgrep([path], tmp_dir)
+    result = await run_semgrep([path], tmp_dir)
 
-    rule_ids = {f["rule_id"] for f in findings}
+    assert result.success
+    rule_ids = {f["rule_id"] for f in result.findings}
     expected = {
         "hardcoded-secret-string",
         "sql-fstring-injection",
         "bare-except-swallows-errors",
         "unchecked-requests-response",
         "open-without-context-manager",
+        "subprocess-shell-true",
+        "eval-or-exec-usage",
+        "mutable-default-argument",
+        "assert-used-for-validation",
     }
     assert expected.issubset(rule_ids), f"Missing rules: {expected - rule_ids}"
-    assert len(findings) >= 5
+    assert len(result.findings) >= 9
 
 
 @pytest.mark.asyncio
 async def test_clean_python_has_no_findings(tmp_dir):
     path = _copy_fixture("clean_python.py", tmp_dir)
-    findings = await run_semgrep([path], tmp_dir)
-    assert findings == []
+    result = await run_semgrep([path], tmp_dir)
+    assert result.success
+    assert result.findings == []
 
 
 @pytest.mark.asyncio
 async def test_bad_typescript_fires_all_rules(tmp_dir):
     path = _copy_fixture("bad_typescript.ts", tmp_dir)
-    findings = await run_semgrep([path], tmp_dir)
+    result = await run_semgrep([path], tmp_dir)
 
-    rule_ids = {f["rule_id"] for f in findings}
+    assert result.success
+    rule_ids = {f["rule_id"] for f in result.findings}
     expected = {
         "promise-without-catch",
         "console-log-left-in",
         "hardcoded-url-string",
         "any-type-escape-hatch",
+        "non-null-assertion",
     }
     assert expected.issubset(rule_ids), f"Missing rules: {expected - rule_ids}"
 
 
 @pytest.mark.asyncio
+async def test_bad_react_tsx_fires_dangerously_set(tmp_dir):
+    path = _copy_fixture("bad_react.tsx", tmp_dir)
+    result = await run_semgrep([path], tmp_dir)
+
+    assert result.success
+    rule_ids = {f["rule_id"] for f in result.findings}
+    assert "dangerously-set-inner-html" in rule_ids
+
+
+@pytest.mark.asyncio
 async def test_empty_file_list_returns_empty():
-    findings = await run_semgrep([], "/tmp")
-    assert findings == []
+    result = await run_semgrep([], "/tmp")
+    assert result.success
+    assert result.findings == []
 
 
 @pytest.mark.asyncio
 async def test_finding_fields_are_populated(tmp_dir):
     path = _copy_fixture("bad_python.py", tmp_dir)
-    findings = await run_semgrep([path], tmp_dir)
+    result = await run_semgrep([path], tmp_dir)
 
-    for f in findings:
+    for f in result.findings:
         assert f["rule_id"], "rule_id should be non-empty"
         assert f["category"] in ("security", "correctness", "quality", "unknown")
         assert f["severity"] in ("error", "warning", "info")

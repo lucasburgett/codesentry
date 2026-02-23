@@ -1,4 +1,5 @@
 import requests
+import subprocess
 
 api_key = "sk-live-abc123456789"
 
@@ -26,3 +27,20 @@ def do_something():
         result = 1 / 0
     except:
         pass
+
+
+def run_command(cmd):
+    subprocess.run(cmd, shell=True)
+
+
+def dangerous(code):
+    eval(code)
+
+
+def append_item(items=[]):
+    items.append(1)
+    return items
+
+
+def validate(value):
+    assert value > 0
