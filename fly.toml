@@ -1,0 +1,17 @@
+app = "codesentry"
+primary_region = "sjc"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+[mounts]
+  source = "codesentry_data"
+  destination = "/data"
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "5s"

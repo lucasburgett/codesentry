@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CodeSentry — AI code review for AI-generated code</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .container {
+    max-width: 720px;
+    width: 100%;
+    padding: 4rem 2rem 2rem;
+  }
+  h1 {
+    font-size: 2rem;
+    color: #58a6ff;
+    margin-bottom: 0.25rem;
+  }
+  .tagline {
+    font-size: 1.1rem;
+    color: #8b949e;
+    margin-bottom: 2rem;
+  }
+  .description {
+    font-size: 1rem;
+    margin-bottom: 2.5rem;
+    line-height: 1.8;
+  }
+  .cta {
+    display: inline-block;
+    background: #238636;
+    color: #fff;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 3rem;
+    transition: background 0.2s;
+  }
+  .cta:hover { background: #2ea043; }
+  h2 {
+    font-size: 1.1rem;
+    color: #8b949e;
+    margin-bottom: 1rem;
+  }
+  .example {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 1.25rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    margin-bottom: 3rem;
+  }
+  .example .header { color: #58a6ff; font-weight: bold; }
+  .example .risk { color: #3fb950; }
+  .example .finding { color: #f85149; }
+  .example .rule { color: #d2a8ff; }
+  footer {
+    border-top: 1px solid #21262d;
+    padding-top: 1.5rem;
+    font-size: 0.85rem;
+    color: #484f58;
+  }
+  footer a { color: #58a6ff; text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>CodeSentry</h1>
+  <p class="tagline">AI code review for AI-generated code</p>
+
+  <p class="description">
+    CodeSentry is a GitHub App that automatically reviews pull requests for
+    issues in AI-generated code. It combines Semgrep static analysis with
+    Claude-powered behavioral review to catch bugs, security issues, and
+    anti-patterns that slip through human review.
+  </p>
+
+  <a class="cta" href="YOUR_GITHUB_APP_INSTALL_URL">Install on GitHub</a>
+
+  <h2>Example PR comment</h2>
+  <div class="example"><span class="header">## CodeSentry Analysis</span>
+
+<span class="risk">**Risk:** Low</span> | <strong>AI-authored files:</strong> 2 | <strong>Issues:</strong> 3
+
+### Static Analysis (3 findings)
+<span class="finding">1 error</span> · 1 warning · 1 info
+
+<strong>app.py</strong> — 2 issues (1E, 1W)
+- <span class="finding">L3</span> <span class="rule">`hardcoded-secret-string`</span> — Hardcoded secret in variable
+- <span class="risk">L18</span> <span class="rule">`broad-exception-catch`</span> — Catching bare Exception
+
+<strong>utils.py</strong> — 1 issue (1I)
+- L7 <span class="rule">`missing-type-hints`</span> — Function missing return type
+
+---
+<em>Analyzed commit `abc1234`</em>
+<em>To dismiss a finding, reply</em> <code>codesentry ignore rule-id: reason</code></div>
+
+  <footer>
+    <a href="/privacy">Privacy Policy</a>
+  </footer>
+</div>
+</body>
+</html>

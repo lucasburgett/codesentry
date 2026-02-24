@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — CodeSentry</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    line-height: 1.7;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .container {
+    max-width: 720px;
+    width: 100%;
+    padding: 3rem 2rem 2rem;
+  }
+  h1 {
+    font-size: 1.75rem;
+    color: #58a6ff;
+    margin-bottom: 0.5rem;
+  }
+  .updated {
+    color: #484f58;
+    font-size: 0.85rem;
+    margin-bottom: 2rem;
+  }
+  h2 {
+    font-size: 1.1rem;
+    color: #f0f6fc;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+  }
+  p, ul {
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+  }
+  ul { padding-left: 1.5rem; }
+  li { margin-bottom: 0.4rem; }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  footer {
+    border-top: 1px solid #21262d;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    font-size: 0.85rem;
+    color: #484f58;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: February 2026</p>
+
+  <h2>What data we collect</h2>
+  <p>When CodeSentry analyzes a pull request, it accesses the following data from your GitHub repository:</p>
+  <ul>
+    <li>Repository metadata (name, owner)</li>
+    <li>Pull request diffs (added and modified code)</li>
+    <li>Commit messages associated with the pull request</li>
+    <li>GitHub installation and webhook event metadata</li>
+  </ul>
+
+  <h2>What data is sent externally</h2>
+  <p>
+    Pull request diffs are sent to <strong>Anthropic's API</strong> (Claude) for
+    behavioral analysis. This allows CodeSentry to generate summaries and identify
+    potential risks in the code changes. Anthropic's privacy policy is available at
+    <a href="https://www.anthropic.com/privacy">anthropic.com/privacy</a>.
+  </p>
+  <p>No other third-party services receive your code.</p>
+
+  <h2>Data retention</h2>
+  <p>
+    Analysis results (findings, risk scores, and LLM summaries) are stored in our
+    database. <strong>No raw source code is stored after analysis completes.</strong>
+    Only structured analysis results and metadata are retained.
+  </p>
+
+  <h2>How to uninstall and delete your data</h2>
+  <p>
+    You can uninstall CodeSentry at any time from your GitHub organization or
+    account settings. To request deletion of all stored analysis data, uninstall
+    the GitHub App and email
+    <a href="mailto:privacy@codesentry.dev">privacy@codesentry.dev</a>.
+  </p>
+
+  <h2>Changes to this policy</h2>
+  <p>
+    We may update this privacy policy from time to time. Changes will be reflected
+    on this page with an updated date.
+  </p>
+
+  <footer>
+    <a href="/">Back to CodeSentry</a>
+  </footer>
+</div>
+</body>
+</html>
